@@ -14,6 +14,7 @@ import static org.neo4j.driver.v1.Values.parameters;
  * @author singha
  */
 public class testMain implements AutoCloseable {
+
     private final Driver driver;
 
     public testMain( String uri, String user, String password )
@@ -27,36 +28,60 @@ public class testMain implements AutoCloseable {
         driver.close();
     }
 
-    public void printGreeting( final String message )
+    public void printGreeting(final String message)
     {
         try ( Session session = driver.session() )
         {
-            String greeting = session.writeTransaction( new TransactionWork<String>()
+            String connection_greeting = session.writeTransaction( new TransactionWork<String>()
             {
                 @Override
                 public String execute( Transaction tx )
                 {
                     StatementResult result = tx.run( "CREATE (a:Greeting) " +
                                                      "SET a.message = $message " +
-                                                     "RETURN a.message + ', from node ' + id(a)",
+                                                     "RETURN a.message + ', greetings from neo4j node: ' + id(a)",
                             parameters( "message", message ) );
                     return result.single().get( 0 ).asString();
                 }
             } );
-            System.out.println( greeting );
+            System.out.println(connection_greeting);
         }
     }
     
     public static void main(String args[]) {
         // to connect to RRes test neo4j bolt server (url, username, password)
-        try ( testMain greeter = new testMain( "bolt://babvs48.rothamsted.ac.uk:7688", "neo4j", "test" ) )
-        {
-            greeter.printGreeting( "Connected..., msg: " );
+        try {
+            testMain tm= new testMain( "bolt://babvs48.rothamsted.ac.uk:7688", "neo4j", "test" );
+            tm.printGreeting("Connected...");
+            
+            // some simple test queries.
+            tm.testQueries();
         }
         catch(Exception ex)
             {
                 ex.printStackTrace();
             }
         
+    }
+
+    public void testQueries() {
+        try ( Session session = driver.session() )
+        {
+            String query_results= session.writeTransaction( new TransactionWork<String>()
+            {
+                @Override
+                public String execute( Transaction tx )
+                {
+                    StatementResult count_nodes = tx.run("MATCH (n) RETURN count(*)");
+                    StatementResult count_edges = tx.run("MATCH ()-[r]->() RETURN count(r)");
+                    StatementResult wheat_genes = tx.run("MATCH p=( g:Gene {TAXID:\"4565\"} ) RETURN count(p)");
+                    
+                    return "Total nodes= "+ count_nodes.single().get(0).asInt() 
+                            +", edges= "+ count_edges.single().get(0).asInt() 
+                            +", \n Wheat genes: "+ wheat_genes.single().get(0).asInt(); // use .asString() for String results
+                }
+            } );
+            System.out.println(query_results);
+        }
     }
 }
